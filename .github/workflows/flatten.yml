@@ -13,17 +13,31 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Flatten directory
+        id: flatten
         run: |
-          if [ -d "zrp-wallet-extension" ]; then
-            shopt -s dotglob
-            mv zrp-wallet-extension/* .
-            rmdir zrp-wallet-extension
-          else
+          if [ ! -d "zrp-wallet-extension" ]; then
+            echo "already_flat=true" >> $GITHUB_OUTPUT
             echo "zrp-wallet-extension not found, nothing to flatten"
-            exit 1
+            exit 0
           fi
 
+          shopt -s dotglob
+          
+          # Move each item individually to handle conflicts gracefully
+          for item in zrp-wallet-extension/*; do
+            target=$(basename "$item")
+            if [ -e "$target" ] && [ "$target" != ".github" ]; then
+              echo "Warning: $target already exists, skipping"
+            else
+              mv "$item" .
+            fi
+          done
+          
+          rmdir zrp-wallet-extension 2>/dev/null || true
+          echo "already_flat=false" >> $GITHUB_OUTPUT
+
       - name: Commit changes
+        if: steps.flatten.outputs.already_flat != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "actions@github.com"
