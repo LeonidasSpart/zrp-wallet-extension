@@ -23,6 +23,14 @@ for (const entry of entryPoints) {
     target: "chrome111",
     outfile: `dist/${entry.out}.js`,
     define: { "process.env.NODE_ENV": '"production"' },
+    // Some dependencies (via ed25519-hd-key's HMAC chain) expect Node's
+    // built-in "stream" and "events" modules, which don't exist in a
+    // browser/service-worker context. Redirect them to browser-safe
+    // polyfill packages instead.
+    alias: {
+      stream: "stream-browserify",
+      events: "events",
+    },
   });
   console.log(`built dist/${entry.out}.js (${entry.format})`);
 }
