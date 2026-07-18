@@ -23,11 +23,11 @@ jobs:
 
           shopt -s dotglob
           
-          # Move each item individually to handle conflicts gracefully
+          # Move each item individually, skipping existing directories like .github
           for item in zrp-wallet-extension/*; do
             target=$(basename "$item")
-            if [ -e "$target" ] && [ "$target" != ".github" ]; then
-              echo "Warning: $target already exists, skipping"
+            if [ -e "$target" ]; then
+              echo "Skipping $target (already exists at root)"
             else
               mv "$item" .
             fi
