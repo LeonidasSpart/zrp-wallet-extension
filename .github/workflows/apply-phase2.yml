@@ -12,52 +12,33 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Extract and overwrite files
+      - name: Move folder contents to root
         run: |
-          # Find the zip file (supports different names)
-          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" -type f | head -n 1)
+          # Find the folder (phase2-package, zrp-phase2b-metadata, etc.)
+          FOLDER=$(find . -maxdepth 1 -type d ! -path "." ! -path "./.git" ! -path "./.github" | head -n 1)
 
-          if [ -z "$ZIP_FILE" ]; then
-            echo "❌ No zip file found in the repository root."
-            echo "📌 Please upload a zip file named zrp-phase2b-metadata.zip or similar."
-            exit 1
-          fi
-
-          echo "📦 Found zip: $ZIP_FILE"
-
-          # Extract the zip
-          unzip -o "$ZIP_FILE"
-          rm -f "$ZIP_FILE"
-
-          # Find the extracted directory (often phase2-package or similar)
-          EXTRACTED_DIR=$(find . -maxdepth 1 -type d ! -path "." ! -path "./.git" ! -path "./.github" | head -n 1)
-
-          if [ -z "$EXTRACTED_DIR" ]; then
-            echo "❌ No extracted directory found."
-            echo "📌 The zip might have extracted files directly – checking..."
+          if [ -z "$FOLDER" ]; then
+            echo "✅ No folder found – already flattened"
             exit 0
           fi
 
-          echo "📁 Extracted directory: $EXTRACTED_DIR"
+          echo "📁 Found folder: $FOLDER"
 
-          # Move everything from extracted directory to root
+          # Move everything from the folder to root
           shopt -s dotglob
-          cp -rf "$EXTRACTED_DIR"/* . 2>/dev/null || true
-          cp -rf "$EXTRACTED_DIR"/.* . 2>/dev/null || true
+          mv "$FOLDER"/* . 2>/dev/null || true
+          mv "$FOLDER"/.* . 2>/dev/null || true
           shopt -u dotglob
 
-          # Remove the extracted directory
-          rm -rf "$EXTRACTED_DIR"
+          # Remove the empty folder
+          rm -rf "$FOLDER"
 
-          # Clean up any leftover zip files
-          rm -f *.zip
-
-          echo "✅ Files extracted and moved to root successfully."
+          echo "✅ Files moved to root"
 
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "actions@github.com"
           git add -A
-          git diff --staged --quiet || git commit -m "Phase 2: SPL token support (from zip)"
+          git diff --staged --quiet || git commit -m "Phase 2: move files to root"
           git push
