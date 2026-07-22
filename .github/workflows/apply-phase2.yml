@@ -14,22 +14,50 @@ jobs:
 
       - name: Extract and overwrite files
         run: |
-          if [ ! -f "zrp-phase2b-metadata.zip" ]; then
-            echo "zrp-phase2b-metadata.zip not found at repo root"
+          # Find the zip file (supports different names)
+          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" -type f | head -n 1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "❌ No zip file found in the repository root."
+            echo "📌 Please upload a zip file named zrp-phase2b-metadata.zip or similar."
             exit 1
           fi
-          unzip -o zrp-phase2b-metadata.zip
-          rm zrp-phase2b-metadata.zip
 
-          if [ -d "phase2-package" ]; then
-            cp -rf phase2-package/* .
-            rm -rf phase2-package
+          echo "📦 Found zip: $ZIP_FILE"
+
+          # Extract the zip
+          unzip -o "$ZIP_FILE"
+          rm -f "$ZIP_FILE"
+
+          # Find the extracted directory (often phase2-package or similar)
+          EXTRACTED_DIR=$(find . -maxdepth 1 -type d ! -path "." ! -path "./.git" ! -path "./.github" | head -n 1)
+
+          if [ -z "$EXTRACTED_DIR" ]; then
+            echo "❌ No extracted directory found."
+            echo "📌 The zip might have extracted files directly – checking..."
+            exit 0
           fi
+
+          echo "📁 Extracted directory: $EXTRACTED_DIR"
+
+          # Move everything from extracted directory to root
+          shopt -s dotglob
+          cp -rf "$EXTRACTED_DIR"/* . 2>/dev/null || true
+          cp -rf "$EXTRACTED_DIR"/.* . 2>/dev/null || true
+          shopt -u dotglob
+
+          # Remove the extracted directory
+          rm -rf "$EXTRACTED_DIR"
+
+          # Clean up any leftover zip files
+          rm -f *.zip
+
+          echo "✅ Files extracted and moved to root successfully."
 
       - name: Commit changes
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "actions@github.com"
           git add -A
-          git diff --staged --quiet || git commit -m "Phase 2: SPL token support"
+          git diff --staged --quiet || git commit -m "Phase 2: SPL token support (from zip)"
           git push
