@@ -1,0 +1,35 @@
+name: Apply Phase 2 Update
+
+permissions:
+  contents: write
+
+on:
+  workflow_dispatch:
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract and overwrite files
+        run: |
+          if [ ! -f "zrp-phase2-update.zip" ]; then
+            echo "zrp-phase2-update.zip not found at repo root"
+            exit 1
+          fi
+          unzip -o zrp-phase2-update.zip
+          rm zrp-phase2-update.zip
+
+          if [ -d "phase2-package" ]; then
+            cp -rf phase2-package/* .
+            rm -rf phase2-package
+          fi
+
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "actions@github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "Phase 2: SPL token support"
+          git push
