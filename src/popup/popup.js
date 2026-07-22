@@ -7,7 +7,9 @@ const state = {
   error: "",
   pendingMnemonic: null, // held only in memory during the create-wallet flow
   balance: null,
+  tokens: [],
   transactions: [],
+  selectedAsset: "SOL", // "SOL" or a mint address, set when Send is opened from a specific asset row
 };
 
 function send(type, payload = {}) {
@@ -17,6 +19,15 @@ function send(type, payload = {}) {
 function short(address, chars = 4) {
   if (!address) return "";
   return `${address.slice(0, chars)}…${address.slice(-chars)}`;
+}
+
+// Token names/symbols come from arbitrary on-chain data set by whoever
+// minted the token — never trust it as safe HTML.
+function escapeHtml(str) {
+  if (!str) return "";
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 function render() {
@@ -259,12 +270,14 @@ function renderUnlock() {
 // ---------- home ----------
 
 async function loadHomeData() {
-  const [balanceRes, txRes, stateRes] = await Promise.all([
+  const [balanceRes, tokensRes, txRes, stateRes] = await Promise.all([
     send("GET_BALANCE"),
+    send("GET_TOKEN_BALANCES"),
     send("GET_TRANSACTIONS"),
     send("GET_STATE"),
   ]);
   if (balanceRes.ok) state.balance = balanceRes.sol;
+  if (tokensRes.ok) state.tokens = tokensRes.tokens;
   if (txRes.ok) state.transactions = txRes.transactions;
   if (stateRes.ok) state.network = stateRes.network;
   if (state.screen === "home") render();
@@ -294,9 +307,46 @@ function renderHome() {
       </div>
     </div>
 
+    <h2 style="margin-top: 8px;">Tokens</h2>
+    <div class="tx-list" id="token-list"></div>
+
     <h2 style="margin-top: 8px;">Recent activity</h2>
     <div class="tx-list" id="tx-list"></div>
   `;
+
+  const tokenList = el.querySelector("#token-list");
+  if (state.tokens.length === 0) {
+    tokenList.innerHTML = `<div class="empty-state">No other tokens yet.</div>`;
+  } else {
+    tokenList.innerHTML = state.tokens
+      .map((t) => {
+        const label = t.symbol
+          ? escapeHtml(t.symbol)
+          : t.name
+          ? escapeHtml(t.name)
+          : short(t.mint, 5);
+        const iconHtml = t.image
+          ? `<img class="token-icon" src="${escapeHtml(t.image)}" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'token-icon token-icon-fallback'}))" />`
+          : `<div class="token-icon token-icon-fallback"></div>`;
+        return `
+        <div class="tx-row token-row" data-mint="${t.mint}">
+          <div class="row" style="gap:10px;">
+            ${iconHtml}
+            <span class="eyebrow" style="color: var(--text);">${label}</span>
+          </div>
+          <span class="tx-sig">${t.amount}</span>
+        </div>`;
+      })
+      .join("");
+    tokenList.querySelectorAll(".token-row").forEach((row) => {
+      row.onclick = () => {
+        state.selectedAsset = row.dataset.mint;
+        state.error = "";
+        state.screen = "send";
+        render();
+      };
+    });
+  }
 
   const txList = el.querySelector("#tx-list");
   if (state.transactions.length === 0) {
@@ -319,6 +369,7 @@ function renderHome() {
   };
   el.querySelector("#btn-send").onclick = () => {
     state.error = "";
+    state.selectedAsset = "SOL";
     state.screen = "send";
     render();
   };
@@ -331,12 +382,23 @@ function renderHome() {
 // ---------- send ----------
 
 function renderSend() {
+  const isToken = state.selectedAsset !== "SOL";
+  const token = isToken ? state.tokens.find((t) => t.mint === state.selectedAsset) : null;
+  const assetLabel = isToken
+    ? escapeHtml(token?.symbol || token?.name || short(state.selectedAsset, 5))
+    : "SOL";
+
   const el = screenEl();
   el.innerHTML = `
-    <h1>Send SOL</h1>
+    <h1>Send ${assetLabel}</h1>
+    ${
+      isToken
+        ? `<p>Balance: ${token ? token.amount : "—"}</p>`
+        : ""
+    }
     <div class="stack">
       <input type="text" id="to" placeholder="Recipient address" class="mono" />
-      <input type="number" id="amount" placeholder="Amount (SOL)" step="0.0001" min="0" />
+      <input type="number" id="amount" placeholder="Amount${isToken ? "" : " (SOL)"}" step="any" min="0" />
       <div class="error-text" id="err"></div>
     </div>
     <div class="spacer"></div>
@@ -365,7 +427,24 @@ function renderSend() {
     btn.disabled = true;
     btn.textContent = "Sending…";
 
-    const res = await send("SEND_TRANSFER", { to, amountSol: amount });
+    let res;
+    if (isToken) {
+      if (!token) {
+        errEl.textContent = "Couldn't find that token's balance. Go back and try again.";
+        btn.disabled = false;
+        btn.textContent = "Send";
+        return;
+      }
+      const rawAmount = BigInt(Math.round(amount * 10 ** token.decimals));
+      res = await send("SEND_TOKEN_TRANSFER", {
+        to,
+        mint: state.selectedAsset,
+        rawAmount: rawAmount.toString(),
+      });
+    } else {
+      res = await send("SEND_TRANSFER", { to, amountSol: amount });
+    }
+
     btn.disabled = false;
     btn.textContent = "Send";
 
@@ -373,6 +452,7 @@ function renderSend() {
       errEl.textContent = res.error || "Transaction failed.";
       return;
     }
+    state.selectedAsset = "SOL";
     state.screen = "home";
     render();
     loadHomeData();
