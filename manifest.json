@@ -36,6 +36,7 @@
   "permissions": ["storage", "alarms"],
   "host_permissions": [
     "https://api.mainnet-beta.solana.com/*",
-    "https://api.devnet.solana.com/*"
+    "https://api.devnet.solana.com/*",
+    "https://*/*"
   ]
 }
