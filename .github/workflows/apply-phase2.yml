@@ -14,12 +14,12 @@ jobs:
 
       - name: Extract and overwrite files
         run: |
-          if [ ! -f "zrp-phase2-update.zip" ]; then
-            echo "zrp-phase2-update.zip not found at repo root"
+          if [ ! -f "zrp-phase2b-metadata.zip" ]; then
+            echo "zrp-phase2b-metadata.zip not found at repo root"
             exit 1
           fi
-          unzip -o zrp-phase2-update.zip
-          rm zrp-phase2-update.zip
+          unzip -o zrp-phase2b-metadata.zip
+          rm zrp-phase2b-metadata.zip
 
           if [ -d "phase2-package" ]; then
             cp -rf phase2-package/* .
