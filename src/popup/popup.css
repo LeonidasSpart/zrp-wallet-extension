@@ -311,6 +311,28 @@ textarea {
   border: 1px solid var(--border);
 }
 
+.token-row {
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.token-row:hover {
+  border-color: var(--accent-dim);
+}
+
+.token-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface-raised);
+}
+
+.token-icon-fallback {
+  border: 1px solid var(--border);
+}
+
 .tx-sig {
   font-family: var(--font-mono);
   font-size: 12px;
